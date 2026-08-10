@@ -34,7 +34,7 @@ func (p *Provider) Init() {
 }
 
 type apiResult struct {
-	LyricsFile string `json:"lyricsfile"`
+	Lyricsfile string `json:"lyricsfile"`
 }
 
 func (p *Provider) Search(ctx context.Context, q lyrics.Query) (*lyrics.Result, error) {
@@ -85,15 +85,12 @@ func (p *Provider) do(ctx context.Context, endpoint string, out any) error {
 }
 
 func toResult(r apiResult) (*lyrics.Result, error) {
-	if r.LyricsFile == "" {
+	if r.Lyricsfile == "" {
 		return nil, nil
 	}
-	res, err := format.ParseLyricsFile([]byte(r.LyricsFile))
+	res, err := format.ParseLyricsfile([]byte(r.Lyricsfile))
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
-	}
-	if !res.Instrumental && len(res.Lines) == 0 {
-		return nil, nil
 	}
 	return res, nil
 }

@@ -33,7 +33,7 @@ type LrclibResponse struct {
 	TrackName    string  `json:"trackName"`
 	ArtistName   string  `json:"artistName"`
 	AlbumName    string  `json:"albumName"`
-	LyricsFile   string  `json:"lyricsfile"`
+	Lyricsfile   string  `json:"lyricsfile"`
 	ID           int     `json:"id"`
 	Duration     float64 `json:"duration"`
 	Instrumental bool    `json:"instrumental"`
@@ -70,18 +70,14 @@ func (s *Server) lrclibSearchOp() huma.Operation {
 }
 
 func lrclibResponse(res *orchestrator.Response) LrclibResponse {
-	txtEnc, _ := format.Get("txt")
-	lrcEnc, _ := format.Get("lrc")
-	lfEnc, _ := format.Get("lyricsfile")
-
 	var plainLyrics *string
-	if plain := renderFormat(txtEnc, res.Result); plain != "" {
+	if plain := renderFormat("txt", res.Result); plain != "" {
 		plainLyrics = &plain
 	}
 
 	var syncedLyrics *string
 	if res.Result.SyncLevel >= lyrics.SyncLine {
-		synced := renderFormat(lrcEnc, res.Result)
+		synced := renderFormat("lrc", res.Result)
 		syncedLyrics = &synced
 	}
 
@@ -93,12 +89,13 @@ func lrclibResponse(res *orchestrator.Response) LrclibResponse {
 		Duration:     float64(track.Duration),
 		PlainLyrics:  plainLyrics,
 		SyncedLyrics: syncedLyrics,
-		LyricsFile:   renderFormat(lfEnc, res.Result),
+		Lyricsfile:   renderFormat("lyricsfile", res.Result),
 		Instrumental: res.Result.Instrumental,
 	}
 }
 
-func renderFormat(enc format.Encoder, r *lyrics.Result) string {
+func renderFormat(name string, r *lyrics.Result) string {
+	enc, _ := format.Get(name)
 	var buf bytes.Buffer
 	enc.Encode(&buf, r)
 	return buf.String()
