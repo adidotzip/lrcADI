@@ -27,6 +27,13 @@ func parseRichsync(body string) []lyrics.Line {
 
 		words := make([]lyrics.Word, 0, len(e.Lines))
 		for _, w := range e.Lines {
+			if strings.TrimSpace(w.Content) == "" {
+				if len(words) > 0 {
+					words[len(words)-1].Text += w.Content
+				}
+				continue
+			}
+
 			wStart := int64((e.StartSec + w.OffsetSec) * 1000)
 			if len(words) > 0 {
 				words[len(words)-1].EndMs = wStart
