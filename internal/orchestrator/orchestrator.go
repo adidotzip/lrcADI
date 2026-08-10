@@ -109,9 +109,6 @@ func (o *Orchestrator) Get(ctx context.Context, req Request) (*Response, error) 
 	if err != nil {
 		return nil, err
 	}
-	if len(active) == 0 {
-		return nil, ErrNoProviders
-	}
 
 	track, err := o.resolver.Resolve(ctx, isrc.ResolveInput{
 		Artist:   req.Artist,

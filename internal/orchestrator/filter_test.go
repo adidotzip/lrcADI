@@ -59,10 +59,30 @@ func TestFilterBySources(t *testing.T) {
 		}
 	})
 
-	t.Run("unknown provider: error", func(t *testing.T) {
+	t.Run("unknown provider only: error", func(t *testing.T) {
 		_, err := filterBySources(all, []string{"unknown"})
 		if !errors.Is(err, ErrInvalidSource) {
 			t.Errorf("expected ErrInvalidSource, got %v", err)
+		}
+	})
+
+	t.Run("unknown mixed with known include: unknown dropped", func(t *testing.T) {
+		out, err := filterBySources(all, []string{"word1", "unknown"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(out) != 1 || out[0].ID() != "word1" {
+			t.Errorf("expected [word1], got %v", providers.IDs(out))
+		}
+	})
+
+	t.Run("unknown exclude: no-op", func(t *testing.T) {
+		out, err := filterBySources(all, []string{"!unknown"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(out) != 3 {
+			t.Errorf("expected 3 providers, got %v", providers.IDs(out))
 		}
 	})
 

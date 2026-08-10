@@ -11,18 +11,9 @@ import (
 
 var ErrInvalidSource = errors.New("invalid source")
 
-// restricts list of providers to the given subset
-//
-// non-prefixed entries mean "keep only these",
-// "!"-prefixed entries mean "drop these"
 func filterBySources(provs []providers.Provider, sources []string) ([]providers.Provider, error) {
 	if len(sources) == 0 {
 		return provs, nil
-	}
-
-	known := make(map[string]struct{}, len(provs))
-	for _, p := range provs {
-		known[p.ID()] = struct{}{}
 	}
 
 	var include, exclude []string
@@ -31,9 +22,6 @@ func filterBySources(provs []providers.Provider, sources []string) ([]providers.
 		name, isExclude := strings.CutPrefix(s, "!")
 		if name == "" {
 			return nil, fmt.Errorf("%w: empty source name", ErrInvalidSource)
-		}
-		if _, ok := known[name]; !ok {
-			return nil, fmt.Errorf("%w: unknown provider %q", ErrInvalidSource, name)
 		}
 		if isExclude {
 			exclude = append(exclude, name)
@@ -46,12 +34,19 @@ func filterBySources(provs []providers.Provider, sources []string) ([]providers.
 		return nil, fmt.Errorf("%w: cannot mix include and exclude", ErrInvalidSource)
 	}
 
+	var out []providers.Provider
 	if len(include) > 0 {
-		return slices.DeleteFunc(slices.Clone(provs), func(p providers.Provider) bool {
+		out = slices.DeleteFunc(slices.Clone(provs), func(p providers.Provider) bool {
 			return !slices.Contains(include, p.ID())
-		}), nil
+		})
+	} else {
+		out = slices.DeleteFunc(slices.Clone(provs), func(p providers.Provider) bool {
+			return slices.Contains(exclude, p.ID())
+		})
 	}
-	return slices.DeleteFunc(slices.Clone(provs), func(p providers.Provider) bool {
-		return slices.Contains(exclude, p.ID())
-	}), nil
+
+	if len(out) == 0 {
+		return nil, fmt.Errorf("%w: no providers match the requested filter", ErrInvalidSource)
+	}
+	return out, nil
 }
