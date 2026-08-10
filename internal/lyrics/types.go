@@ -74,8 +74,8 @@ type Track struct {
 
 type Word struct {
 	Text    string `json:"text"`
-	StartMs int64  `json:"start"`
-	EndMs   int64  `json:"end"`
+	StartMs int64  `json:"start" doc:"in milliseconds"`
+	EndMs   int64  `json:"end" doc:"in milliseconds"`
 }
 
 type Line struct {

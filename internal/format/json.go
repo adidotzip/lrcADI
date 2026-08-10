@@ -15,8 +15,8 @@ type JSONMeta struct {
 
 type JSONLine struct {
 	Text    string        `json:"text"`
-	StartMs *int64        `json:"start,omitempty"`
-	EndMs   *int64        `json:"end,omitempty"`
+	StartMs *int64        `json:"start,omitempty" doc:"in milliseconds"`
+	EndMs   *int64        `json:"end,omitempty" doc:"in milliseconds"`
 	Words   []lyrics.Word `json:"words,omitempty"`
 }
 
