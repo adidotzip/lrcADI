@@ -15,8 +15,8 @@ func isInstrumentalMarker(s string) bool {
 	}) == ""
 }
 
-// unmarshals a JSON number or JSON string into int64, as YouTube sometimes
-// returns millisecond timestamps as quoted strings (?)
+// YouTube returns these millisecond timestamps as quoted strings, so accept
+// either a JSON number or string
 type int64S int64
 
 func (v *int64S) UnmarshalJSON(b []byte) error {
@@ -198,7 +198,7 @@ func (r *timedBrowseResp) parse() ([]lyrics.Line, string) {
 	for _, tl := range data.TimedLyricsData {
 		start := int64(tl.CueRange.StartTimeMilliseconds)
 		end := int64(tl.CueRange.EndTimeMilliseconds)
-		if start == 0 {
+		if start == 0 && end == 0 {
 			continue
 		}
 		text := tl.LyricLine
