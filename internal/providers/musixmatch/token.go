@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/f1nniboy/lrcmux/internal/cache"
 	"github.com/f1nniboy/lrcmux/internal/providers"
 )
@@ -20,40 +22,68 @@ const tokenTTL = 0 // 24 * time.Hour
 
 var errTokenUnusable = errors.New("token unusable")
 
-type tokenSlot struct {
-	token string
-	mu    sync.Mutex
-}
-
 type tokenPool struct {
-	cache   cache.Cache
-	client  *http.Client
-	log     *slog.Logger
-	slots   []*tokenSlot
+	cache  cache.Cache
+	client *http.Client
+	log    *slog.Logger
+	sf     singleflight.Group
+
+	tokens []string
+
+	mu      sync.Mutex
 	current int
-	mu      sync.RWMutex
 }
 
 func newTokenPool(n int, client *http.Client, c cache.Cache, log *slog.Logger) *tokenPool {
-	slots := make([]*tokenSlot, n)
-	for i := range n {
-		slots[i] = &tokenSlot{}
-	}
-	return &tokenPool{slots: slots, client: client, cache: c, log: log}
+	return &tokenPool{tokens: make([]string, n), client: client, cache: c, log: log}
 }
 
 func (p *tokenPool) cacheKey(idx int) string {
 	return fmt.Sprintf("mxm:token:%d", idx)
 }
 
-func (p *tokenPool) get(ctx context.Context) (string, int, error) {
-	for range len(p.slots) {
-		p.mu.Lock()
+func (p *tokenPool) ready() (string, int, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for range p.tokens {
 		idx := p.current
-		p.current = (p.current + 1) % len(p.slots)
-		p.mu.Unlock()
+		p.current = (p.current + 1) % len(p.tokens)
+		if p.tokens[idx] != "" {
+			return p.tokens[idx], idx, true
+		}
+	}
+	return "", -1, false
+}
 
-		token, err := p.trySlot(ctx, idx)
+func (p *tokenPool) nextEmpty() (int, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for range p.tokens {
+		idx := p.current
+		p.current = (p.current + 1) % len(p.tokens)
+		if p.tokens[idx] == "" {
+			return idx, true
+		}
+	}
+	return -1, false
+}
+
+func (p *tokenPool) store(idx int, token string) {
+	p.mu.Lock()
+	p.tokens[idx] = token
+	p.mu.Unlock()
+}
+
+func (p *tokenPool) get(ctx context.Context) (string, int, error) {
+	if token, idx, ok := p.ready(); ok {
+		return token, idx, nil
+	}
+	for range p.tokens {
+		idx, ok := p.nextEmpty()
+		if !ok {
+			break
+		}
+		token, err := p.load(ctx, idx)
 		if err != nil {
 			if errors.Is(err, providers.ErrRateLimited) {
 				p.log.Debug("token fetch rate limited, trying next slot", "slot", idx)
@@ -63,78 +93,60 @@ func (p *tokenPool) get(ctx context.Context) (string, int, error) {
 		}
 		return token, idx, nil
 	}
+	if token, idx, ok := p.ready(); ok {
+		return token, idx, nil
+	}
 	return "", -1, providers.ErrRateLimited
 }
 
-func (p *tokenPool) trySlot(ctx context.Context, idx int) (string, error) {
-	slot := p.slots[idx]
-	slot.mu.Lock()
-	defer slot.mu.Unlock()
-
-	if slot.token != "" {
-		return slot.token, nil
-	}
-	if p.cache != nil {
-		val, status, err := cache.Get[string](ctx, p.cache, p.cacheKey(idx))
-		if err == nil && status == cache.Hit && val != "" {
-			slot.token = val
-			return slot.token, nil
+func (p *tokenPool) load(ctx context.Context, idx int) (string, error) {
+	v, err, _ := p.sf.Do(p.cacheKey(idx), func() (any, error) {
+		if p.cache != nil {
+			val, status, err := cache.Get[string](ctx, p.cache, p.cacheKey(idx))
+			if err == nil && status == cache.Hit && val != "" {
+				p.store(idx, val)
+				return val, nil
+			}
 		}
-	}
-	p.log.Debug("fetching token", "slot", idx)
-	token, err := p.fetch(ctx)
+		token, err := p.fetch(ctx)
+		if err != nil {
+			return "", err
+		}
+		p.store(idx, token)
+		if p.cache != nil {
+			if err := cache.Set(ctx, p.cache, p.cacheKey(idx), token, tokenTTL); err != nil {
+				p.log.Warn("token cache set failed", "slot", idx, "err", err)
+			}
+		}
+		p.log.Debug("token ready", "slot", idx, "token", token[:8])
+		return token, nil
+	})
 	if err != nil {
 		return "", err
 	}
-	slot.token = token
-	if p.cache != nil {
-		if err := cache.Set(ctx, p.cache, p.cacheKey(idx), token, tokenTTL); err != nil {
-			p.log.Warn("token cache set failed", "slot", idx, "err", err)
-		}
-	}
-	p.log.Debug("token ready", "slot", idx, "token", token[:8])
-	return token, nil
+	return v.(string), nil
 }
 
 func (p *tokenPool) retire(idx int) {
-	slot := p.slots[idx]
-	slot.mu.Lock()
-	alreadyRetired := slot.token == ""
-	slot.token = ""
-	slot.mu.Unlock()
-
-	if alreadyRetired {
+	p.mu.Lock()
+	had := p.tokens[idx] != ""
+	p.tokens[idx] = ""
+	p.mu.Unlock()
+	if !had {
 		return
 	}
 	if p.cache != nil {
 		p.cache.Delete(context.Background(), p.cacheKey(idx))
 	}
-
 	go p.refreshSlot(idx)
 }
 
 func (p *tokenPool) refreshSlot(idx int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	p.log.Debug("refreshing token slot", "slot", idx)
-	token, err := p.fetch(ctx)
-	if err != nil {
+	if _, err := p.load(ctx, idx); err != nil {
 		p.log.Warn("token slot refresh failed", "slot", idx, "err", err)
-		return
 	}
-
-	slot := p.slots[idx]
-	slot.mu.Lock()
-	slot.token = token
-	slot.mu.Unlock()
-
-	if p.cache != nil {
-		if err := cache.Set(ctx, p.cache, p.cacheKey(idx), token, tokenTTL); err != nil {
-			p.log.Warn("token cache set failed", "slot", idx, "err", err)
-		}
-	}
-	p.log.Debug("token slot refreshed", "slot", idx, "token", token[:8])
 }
 
 func (p *tokenPool) fetch(ctx context.Context) (string, error) {

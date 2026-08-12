@@ -140,7 +140,7 @@ func (p *Provider) fetchTier(ctx context.Context, t tier, isrc string) ([]lyrics
 }
 
 func (p *Provider) get(ctx context.Context, endpoint string, extra url.Values) (json.RawMessage, error) {
-	for range len(p.pool.slots) {
+	for range len(p.pool.tokens) {
 		token, idx, err := p.pool.get(ctx)
 		if err != nil {
 			return nil, err
