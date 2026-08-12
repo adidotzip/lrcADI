@@ -17,7 +17,7 @@ func (lfEncoder) Levels() (lo, hi lyrics.SyncLevel) {
 	return lyrics.SyncNone, lyrics.SyncWord
 }
 func (lfEncoder) ContentType() string        { return "text/yaml; charset=utf-8" }
-func (lfEncoder) Extension() string          { return "yaml" }
+func (lfEncoder) Extension() string          { return "lyricsfile.yaml" }
 func (lfEncoder) Desc() string               { return "Used by LRCLIB/LRCGET" }
 func (lfEncoder) SupportsInstrumental() bool { return true }
 

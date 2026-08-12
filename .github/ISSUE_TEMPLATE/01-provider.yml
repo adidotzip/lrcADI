@@ -5,8 +5,8 @@ body:
   - type: input
     id: track
     attributes:
-      label: Track
-      description: Artist and title of the song
+      label: Track(s)
+      description: Artist and title of the affected song(s)
       placeholder: "e.g. Rick Astley - Never Gonna Give You Up"
     validations:
       required: true
@@ -34,6 +34,7 @@ body:
         - Wrong/incorrect lyrics (wrong track matched)
         - Wrong output (e.g. other text that doesn't belong to lyrics)
         - Poor sync quality (e.g. line-level when word-level exists at provider)
+        - Other (describe below)
     validations:
       required: true
   - type: textarea

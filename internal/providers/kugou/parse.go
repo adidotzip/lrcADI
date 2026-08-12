@@ -20,8 +20,7 @@ func isCreditLine(text string) bool {
 }
 
 func stripMetadata(lines []lyrics.Line) []lyrics.Line {
-	// scan backwards for the last credit line,
-	// then cut out all lines before that
+	// scan backwards for the last credit line, then cut out all lines before that
 	limit := min(30, len(lines))
 	for i := limit - 1; i >= 0; i-- {
 		if isCreditLine(lines[i].Text) {
