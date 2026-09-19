@@ -39,7 +39,7 @@
 
     <div class="flex-1 min-w-0">
       {#if guide.url}
-        <!-- eslint-disable svelte/no-navigation-without-resolve -->
+        
         <a
           class="font-medium text-ink text-sm hover:text-cue transition-colors inline-flex items-center gap-1.5"
           href={guide.url}
@@ -47,12 +47,12 @@
           rel="noopener noreferrer"
           target="_blank"
         >
-          <!-- eslint-enable svelte/no-navigation-without-resolve -->
+       
           {guide.name}
           <svg
             class="w-3 h-3 opacity-50"
             fill="none"
-            stroke="currentColor"
+            stroke="currentColor" 
             stroke-width="4"
             viewBox="0 0 24 24"
           >

@@ -1,0 +1,5 @@
+{
+  "installCommand": "npm install --frozen-lockfile",
+  "buildCommand": "npm run build",
+  "framework": "sveltekit"
+}

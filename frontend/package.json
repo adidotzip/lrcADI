@@ -15,12 +15,14 @@
     "lint": "eslint src",
     "fix": "eslint --fix src",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "deploy": "CF_PAGES=1 vite build && wrangler deploy"
+    "deploy": "CF_PAGES=1 vite build && wrangler deploy",
+    "deploy:vercel": "vercel --prod"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@sveltejs/adapter-cloudflare": "^7.2.9",
     "@sveltejs/adapter-node": "^5.5.7",
+    "@sveltejs/adapter-vercel": "^6.3.4",
     "@sveltejs/kit": "^2.70.1",
     "@sveltejs/vite-plugin-svelte": "^5.1.1",
     "@tailwindcss/vite": "^4.3.3",
